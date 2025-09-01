@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GlassWeather — Real Time Weather App</title>
+   <!-- Favicon -->
+  <link rel="icon" type="image/png" href="cloudy.png">
+  <meta name="description" content="A glassmorphism themed real time weather demo built with HTML CSS and vanilla JavaScript." />
+  <style>
+    /* ============================
+       CSS Variables and Base
+       ============================ */
+    :root{
+      --glass-bg: rgba(255,255,255,0.06);
+      --glass-border: rgba(255,255,255,0.12);
+      --card-radius: 14px;
+      --blur-amount: 10px;
+      --text-primary: #e9eef8;
+      --muted: rgba(233,238,248,0.7);
+      --accent: rgba(255,255,255,0.12);
+      --max-width: 1100px;
+      --transition: 300ms cubic-bezier(.2,.9,.3,1);
+      --nav-height: 64px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+
+    /* Theme variables that will be toggled via JS classes */
+    .theme-default{
+      --bg-grad: linear-gradient(135deg, #1f2a44 0%, #162032 100%);
+      --primary: #72bcd4;
+      --accent-glow: 0 8px 30px rgba(114,188,212,0.12);
+    }
+    .theme-sunny{
+      --bg-grad: linear-gradient(120deg, #ffd66b, #ff9a4a);
+      --primary: #ffdf6b;
+      --accent-glow: 0 12px 40px rgba(255,210,107,0.12);
+    }
+    .theme-cloudy{
+      --bg-grad: linear-gradient(120deg, #8ea9c3, #5a7089);
+      --primary: #cbd7e6;
+      --accent-glow: 0 12px 40px rgba(90,112,137,0.12);
+    }
+    .theme-rainy{
+      --bg-grad: linear-gradient(120deg, #3b4a6b, #1f2a44);
+      --primary: #9fbad9;
+      --accent-glow: 0 12px 40px rgba(79,129,184,0.08);
+    }
+    .theme-night{
+      --bg-grad: linear-gradient(180deg, #0f1530 0%, #091022 100%);
+      --primary: #7aa7f7;
+      --accent-glow: 0 12px 40px rgba(122,167,247,0.08);
+    }
+
+    /* Page layout */
+    html,body{
+      height: 100%;
+      margin: 0;
+      color: var(--text-primary);
+      background: var(--bg-grad);
+      background-attachment: fixed;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+    .app{
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+      gap: 20px;
+    }
+    .container{
+      width: 100%;
+      max-width: var(--max-width);
+    }
+
+    /* Animated subtle moving gradient overlay */
+    .animated-bg{
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background: linear-gradient(120deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02));
+      pointer-events: none;
+      animation: bgShift 12s linear infinite;
+      opacity: 0.7;
+      mix-blend-mode: overlay;
+    }
+    @keyframes bgShift{
+      0%{ transform: translateX(-6%); }
+      50%{ transform: translateX(6%); }
+      100%{ transform: translateX(-6%); }
+    }
+
+    /* Navbar */
+    header.navbar{
+      height: var(--nav-height);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 12px;
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(var(--blur-amount));
+      box-shadow: var(--accent-glow);
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+    .logo{
+      width:38px;
+      height:38px;
+      border-radius:10px;
+      display:grid;
+      place-items:center;
+      background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      border: 1px solid var(--glass-border);
+      font-weight:700;
+      font-size:16px;
+      color:var(--text-primary);
+    }
+    .app-name{
+      font-weight:700;
+      letter-spacing:0.2px;
+    }
+
+    /* Search and controls */
+    .controls{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .search{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      padding:8px 10px;
+      border-radius: 10px;
+      min-width: 220px;
+    }
+    .search input{
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text-primary);
+      font-size: 15px;
+      width: 180px;
+    }
+    .btn{
+      background: transparent;
+      border: 1px solid var(--glass-border);
+      padding:8px 10px;
+      border-radius: 10px;
+      cursor:pointer;
+      color:var(--text-primary);
+      transition: transform var(--transition), box-shadow var(--transition);
+      font-size: 14px;
+    }
+    .btn:focus{
+      outline: 2px solid rgba(255,255,255,0.06);
+      outline-offset: 2px;
+    }
+    .btn:active{ transform: translateY(1px); }
+
+    .unit-toggle{
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    .visually-hidden{ position:absolute !important; height:1px; width:1px; overflow:hidden; clip:rect(1px,1px,1px,1px); white-space:nowrap; }
+
+    /* Main hero */
+    .hero{
+      margin-top: 8px;
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 18px;
+      align-items: stretch;
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      border: 1px solid var(--glass-border);
+      border-radius: var(--card-radius);
+      padding: 18px;
+      backdrop-filter: blur(var(--blur-amount));
+      box-shadow: var(--accent-glow);
+    }
+    .hero-left{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .location{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+    .location h2{
+      margin:0;
+      font-size:20px;
+      font-weight:700;
+    }
+    .time{
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    .main-weather{
+      display:flex;
+      align-items:center;
+      gap:18px;
+      margin-top: 8px;
+    }
+    .weather-visual{
+      width:170px;
+      height:170px;
+      display:grid;
+      place-items:center;
+    }
+    .temp-block{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      align-items:flex-start;
+    }
+    .temp{
+      font-size:48px;
+      font-weight:800;
+      margin:0;
+      line-height:1;
+    }
+    .desc{
+      margin:0;
+      color:var(--muted);
+      font-weight:600;
+    }
+
+    /* Details grid */
+    .details{
+      display:grid;
+      grid-template-columns: repeat(3,1fr);
+      gap:10px;
+      margin-top:10px;
+    }
+    .detail{
+      padding:10px;
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border:1px solid var(--glass-border);
+      font-size:13px;
+      color:var(--muted);
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .detail b{ color:var(--text-primary); font-size:14px; }
+
+    /* Right column current highlights */
+    .highlights{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .small-graph{
+      height:120px;
+      display:grid;
+      place-items:center;
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    /* Forecast grid */
+    .forecast{
+      margin-top:18px;
+      display:grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap:12px;
+    }
+    .forecast .forecast-card{
+      padding:12px;
+      border-radius:12px;
+      text-align:center;
+      transition: transform var(--transition), box-shadow var(--transition);
+      cursor:default;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border:1px solid var(--glass-border);
+      backdrop-filter: blur(var(--blur-amount));
+    }
+    .forecast .forecast-card:hover{
+      transform: translateY(-8px) scale(1.02);
+      box-shadow: 0 18px 50px rgba(0,0,0,0.18);
+    }
+    .forecast .day{ font-weight:700; margin-bottom:6px; }
+    .forecast .temp-small{ font-weight:800; font-size:18px; margin-top:6px; }
+
+    /* Loading skeleton */
+    .loading{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:center;
+      padding:14px;
+    }
+    .loader{
+      width:60px;
+      height:60px;
+      border-radius:50%;
+      border:6px solid rgba(255,255,255,0.06);
+      border-top-color: rgba(255,255,255,0.14);
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin{ to{ transform: rotate(360deg); } }
+
+    /* Footer */
+    footer{
+      margin-top:22px;
+      padding:12px;
+      text-align:center;
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    /* Responsive: mobile first adjustments */
+    @media (max-width: 980px){
+      .hero{ grid-template-columns: 1fr; }
+      .forecast{ grid-template-columns: repeat(3,1fr); }
+      .search input{ width: 120px; }
+      .controls{ gap:6px; flex-wrap:wrap; }
+    }
+    @media (max-width: 560px){
+      .forecast{ grid-template-columns: repeat(2,1fr); }
+      .search input{ width:90px; }
+      .logo{ width:34px; height:34px; font-size:14px; border-radius:8px; }
+    }
+
+    /* Small accessibility focus styles */
+    .focus-ring:focus{
+      outline: 3px solid rgba(255,255,255,0.06);
+      outline-offset: 2px;
+    }
+
+    /* Subtle animation for icons */
+    .sun { animation: pulse 6s ease-in-out infinite; transform-origin:center; }
+    @keyframes pulse{
+      0%{ transform: scale(1); opacity:1; }
+      50%{ transform: scale(1.04); opacity:0.95; }
+      100%{ transform: scale(1); opacity:1; }
+    }
+
+  </style>
+</head>
+<body class="theme-default">
+  <div class="animated-bg" aria-hidden="true"></div>
+
+  <div class="app container" role="application" aria-label="GlassWeather app">
+    <header class="navbar card" role="navigation" aria-label="Top navigation">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">GW</div>
+        <div>
+          <div class="app-name">GlassWeather</div>
+          <div style="font-size:12px; color:var(--muted)">Real time. Clean interface.</div>
+        </div>
+      </div>
+
+      <div class="controls" role="region" aria-label="Search and controls">
+        <div class="search" title="Search city">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+            <circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="1.6" fill="none"></circle>
+          </svg>
+          <input id="searchInput" type="search" inputmode="search" aria-label="Search for city" placeholder="Search city" />
+        </div>
+
+        <div class="unit-toggle" role="radiogroup" aria-label="Unit toggle">
+          <button id="metricBtn" class="btn focus-ring" aria-pressed="true" aria-label="Use metric units">°C</button>
+          <button id="imperialBtn" class="btn" aria-pressed="false" aria-label="Use imperial units">°F</button>
+        </div>
+
+        <button id="locateBtn" class="btn" title="Use my location" aria-label="Use my location">Locate</button>
+      </div>
+    </header>
+
+    <main class="container" style="width:100%;" role="main">
+      <section class="hero-left hero card" aria-live="polite">
+        <div class="hero-left card" style="padding:16px;">
+          <div class="location">
+            <div>
+              <h2 id="locationName">Loading location...</h2>
+              <div class="time" id="timeText">—</div>
+            </div>
+            <div>
+              <button id="refreshBtn" class="btn" title="Refresh weather" aria-label="Refresh weather">Refresh</button>
+            </div>
+          </div>
+
+          <div class="main-weather" role="region" aria-label="Current weather">
+            <div class="weather-visual" id="weatherVisual" aria-hidden="true">
+              <!-- Animated SVG placeholder -->
+              <svg id="currentIcon" width="150" height="150" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Weather icon">
+                <defs>
+                  <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="2" />
+                  </filter>
+                </defs>
+                <g id="iconGroup">
+                  <!-- Sun by default -->
+                  <circle cx="32" cy="24" r="8" fill="currentColor" class="sun" style="color: #FFD66B"></circle>
+                </g>
+              </svg>
+            </div>
+
+            <div class="temp-block" aria-hidden="false">
+              <p class="temp" id="tempMain">—</p>
+              <p class="desc" id="descMain">—</p>
+
+              <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
+                <div id="unitLabel" style="color:var(--muted); font-size:14px">Metric</div>
+                <div style="flex:1"></div>
+                <div style="color:var(--muted); font-size:13px">Updated <span id="updatedAt">—</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="details" id="detailsGrid" aria-label="Weather details">
+            <div class="detail" id="feelsLike"><b>Feels like</b><span id="feelsText">—</span></div>
+            <div class="detail" id="humidity"><b>Humidity</b><span id="humidityText">—</span></div>
+            <div class="detail" id="wind"><b>Wind</b><span id="windText">—</span></div>
+            <div class="detail" id="pressure"><b>Pressure</b><span id="pressureText">—</span></div>
+            <div class="detail" id="visibility"><b>Visibility</b><span id="visibilityText">—</span></div>
+            <div class="detail" id="sunrise"><b>Sunrise / Sunset</b><span id="sunText">—</span></div>
+          </div>
+
+          <div id="errorBox" role="alert" style="display:none; margin-top:10px; color:#ffd2d2; background: linear-gradient(180deg, rgba(255,0,0,0.02), rgba(255,0,0,0.01)); border:1px solid rgba(255,0,0,0.08); padding:10px; border-radius:8px;">
+            <strong>Error</strong>
+            <div id="errorMessage">—</div>
+          </div>
+        </div>
+
+        <div style="width:100%; margin-top:16px;">
+          <h3 style="margin:0 0 10px 0;">7 day forecast</h3>
+          <div id="forecastContainer" class="forecast" aria-live="polite" aria-label="Forecast">
+            <!-- forecast cards will be injected here -->
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      Data provided by OpenWeatherMap. Built by Haris Dev. Saved preferences stored locally in your browser.
+    </footer>
+  </div>
+
+
+
+
+
+
+
+  <script>
+const OPEN_WEATHER_API_KEY = "7fb4f0e47c8fe94deeee787df8f2f59b"; // put your free API key
+
+// ========== Fetch Weather by Coordinates ==========
+async function fetchWeatherByCoords(lat, lon) {
+  // Current weather
+  const currentUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${OPEN_WEATHER_API_KEY}`;
+  const currentRes = await fetch(currentUrl);
+  if (!currentRes.ok) throw new Error("Current weather fetch failed");
+  const currentData = await currentRes.json();
+
+  // 5-day / 3-hour forecast
+  const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${OPEN_WEATHER_API_KEY}`;
+  const forecastRes = await fetch(forecastUrl);
+  if (!forecastRes.ok) throw new Error("Forecast fetch failed");
+  const forecastData = await forecastRes.json();
+
+  return { currentData, forecastData };
+}
+
+// ========== Fetch Weather by City ==========
+async function fetchWeatherByCity(city) {
+  // Current weather
+  const currentUrl = `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${OPEN_WEATHER_API_KEY}`;
+  const currentRes = await fetch(currentUrl);
+  if (!currentRes.ok) throw new Error("City not found");
+  const currentData = await currentRes.json();
+
+  // Forecast
+  const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?q=${city}&units=metric&appid=${OPEN_WEATHER_API_KEY}`;
+  const forecastRes = await fetch(forecastUrl);
+  if (!forecastRes.ok) throw new Error("Forecast fetch failed");
+  const forecastData = await forecastRes.json();
+
+  return { currentData, forecastData };
+}
+
+// ========== Render Weather ==========
+function renderWeather(currentData, forecastData) {
+  const cityName = currentData.name;
+  const temp = Math.round(currentData.main.temp);
+  const description = currentData.weather[0].description;
+
+  document.getElementById("weather").innerHTML = `
+    <h2>${cityName}</h2>
+    <p>${temp}°C - ${description}</p>
+  `;
+
+  // Forecast (grouped by day)
+  const daily = {};
+  forecastData.list.forEach(item => {
+    const date = item.dt_txt.split(" ")[0];
+    if (!daily[date]) {
+      daily[date] = [];
+    }
+    daily[date].push(item.main.temp);
+  });
+
+  let forecastHtml = "<h3>Forecast</h3><ul>";
+  Object.keys(daily).slice(0, 5).forEach(date => {
+    const temps = daily[date];
+    const min = Math.round(Math.min(...temps));
+    const max = Math.round(Math.max(...temps));
+    forecastHtml += `<li>${date}: ${min}°C - ${max}°C</li>`;
+  });
+  forecastHtml += "</ul>";
+
+  document.getElementById("forecast").innerHTML = forecastHtml;
+}
+
+// ========== Init ==========
+async function init(city = null) {
+  try {
+    let weather;
+    if (city) {
+      weather = await fetchWeatherByCity(city);
+    } else {
+      // Use geolocation
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        const weather = await fetchWeatherByCoords(lat, lon);
+        renderWeather(weather.currentData, weather.forecastData);
+      });
+      return;
+    }
+    renderWeather(weather.currentData, weather.forecastData);
+  } catch (err) {
+    console.error("Error:", err);
+    alert("Failed to fetch weather. Check city name or API key.");
+  }
+}
+
+// ========== Search ==========
+document.getElementById("searchBtn").addEventListener("click", () => {
+  const city = document.getElementById("cityInput").value;
+  if (city.trim() !== "") {
+    init(city);
+  } else {
+    alert("Please enter a city name");
+  }
+});
+
+// Load default weather (via geolocation)
+init();
+
+
+  </script>
+</body>
+</html>
